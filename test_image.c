@@ -11,6 +11,28 @@ typedef	struct s_data
     void	*win_ptr;
     void    *img_ptr;
 	int		color;
+	double multiple;
+	double x;
+	double y;
+	double x1;
+	double x2;
+	double y1;
+	double y2;
+	int zoom;
+	int iteration_max;
+	double image_x;
+	double image_y;
+	double c_r;
+	double c_i;
+	double z_r;
+	double z_i;
+	int i;
+	double tmp;
+    int pixel_bits;
+    int line_bits;
+    int endian;
+    char *buffer;
+    int pixel;
 }	t_data;
 
 int color_gradient(int iterations, int max_iterations)
@@ -21,10 +43,59 @@ int color_gradient(int iterations, int max_iterations)
 	int blue;
 
     red = (15 * (1 - t) * t * t * t * 255);
-    green = (15 * (1 - t) * (1 - t) * t * t * 255);
+    green = (5 * (1 - t) * (1 - t) * t * t * 255);
     blue  = (15 * (1 - t) * (1 - t) * (1 - t) * t * 100);
 
     return (red << 16) | (green << 8) | (blue);
+}
+
+int	render(t_data *data)
+{
+	data->x = 0;
+	data->y = 0;
+	data->x1 = -2.1 + data->multiple;
+	data->x2 = 0.6 - data->multiple;
+	data->y1 = -1.2 + data->multiple;
+	data->y2 = 1.2 - data->multiple;
+	data->iteration_max = 305;
+	data->image_x = (data->x2 - data->x1) * data->zoom;
+	data->image_y = (data->y2 - data->y1) * data->zoom;
+
+	data->img_ptr = mlx_new_image(data->mlx_ptr, 800, 700);
+ 	if (!data->img_ptr)
+        return (MLX_ERROR);
+	data->buffer = mlx_get_data_addr(data->img_ptr, &data->pixel_bits, &data->line_bits, &data->endian);
+	while(data->x < data->image_x )
+	{
+		data->y = 0;
+		while(data->y < data->image_y)
+		{
+			data->c_r = data->x / data->zoom + data->x1;
+			data->c_i = data->y / data->zoom + data->y1;
+			data->z_r = 0;
+			data->z_i = 0;
+			data->i = 0;
+			while(data->z_r * data->z_r + data->z_i * data->z_i < 4 && data->i < data->iteration_max)
+			{
+				data->tmp = data->z_r ;
+				data->z_r = data->z_r * data->z_r - data->z_i * data->z_i + data->c_r;
+				data->z_i = 2 * data->z_i * data->tmp + data->c_i;
+				data->i++;
+			}
+			if (data->i != data->iteration_max)
+			{
+                data->pixel = (data->y * data->line_bits) + (data->x * 4);
+                int color = color_gradient(data->i, data->iteration_max);
+				data->buffer[data->pixel] = color;
+				data->buffer[data->pixel + 1] = (color >> 8);
+				data->buffer[data->pixel + 2] = (color >> 16);
+            }
+			data->y++;
+		}
+		data->x++;
+	}    
+    mlx_put_image_to_window(data->mlx_ptr, data->win_ptr, data->img_ptr, 0, 0);
+    return (0);
 }
 
 int	handle_keypress(int keycode, t_data *data)
@@ -37,6 +108,18 @@ int	handle_keypress(int keycode, t_data *data)
         free(data);
 		exit(0);
     }
+	if (keycode == 112)
+    {
+		data->multiple+=0.1;
+		data->zoom*=1.15;
+    	render(data);
+    }
+	if (keycode == 65453)
+    {
+		data->multiple-=0.1;
+		data->zoom*=0.85;
+    	render(data);
+    }
     return (0);
 }
 
@@ -47,58 +130,6 @@ int	handle_crosspress(t_data *data)
     free(data->mlx_ptr);
     free(data);
 	exit(0);
-    return (0);
-}
-
-int	render(t_data *data)
-{
-	double x = 0;
-	double y = 0;
-	double x1 = -2.1;
-	double x2 = 0.6;
-	double y1 = -1.2;
-	double y2 = 1.2;
-	int zoom = 295;
-	int iteration_max = 100;
-	double image_x = (x2 - x1) * zoom;
-	double image_y = (y2 - y1) * zoom;
-	double c_r;
-	double c_i;
-	double z_r;
-	double z_i;
-	int i;
-	double tmp;
-    int pixel_bits;
-    int line_bits;
-    int endian;
-    char *buffer = mlx_get_data_addr(data->img_ptr, &pixel_bits, &line_bits, &endian);
-    int pixel;
-
-	while(x++ < image_x )
-	{
-		y = 0;
-		while(y++ < image_y)
-		{
-			c_r = x / zoom + x1;
-			c_i = y / zoom + y1;
-			z_r = 0;
-			z_i = 0;
-			i = 0;
-			while(z_r * z_r + z_i * z_i < 4 && i < iteration_max)
-			{
-				tmp = z_r ;
-				z_r = z_r * z_r - z_i * z_i + c_r;
-				z_i = 2 * z_i * tmp + c_i;
-				i++;
-			}
-			if (i != iteration_max)
-			{
-                pixel = (y * line_bits) + (x * 4);
-                buffer[pixel] = (color_gradient(i, iteration_max));
-            }
-		}
-	}    
-    mlx_put_image_to_window(data->mlx_ptr, data->win_ptr, data->img_ptr, 0, 0);
     return (0);
 }
 
@@ -119,8 +150,8 @@ int	main(int argc, char **argv)
     data->win_ptr = mlx_new_window(data->mlx_ptr, 800, 700,"my window");
     if (data->win_ptr == NULL)
 		return (free(data->win_ptr), MLX_ERROR);
-    data->img_ptr = mlx_new_image(data->mlx_ptr, 800, 700);
-    mlx_loop_hook(data->mlx_ptr, render, data);
+    data->zoom = 295;
+    render(data);
 	mlx_hook(data->win_ptr, 17, 0, handle_crosspress, data);
 	mlx_hook(data->win_ptr, 2, 13, handle_keypress, data);
     mlx_loop(data->mlx_ptr);

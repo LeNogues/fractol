@@ -1,7 +1,15 @@
 NAME = fract
 
 # Fichiers sources et objets
-SRC = test_image.c
+SRC = 	fractol.c \
+		event.c \
+		init.c \
+		render.c \
+		clean.c \
+		create_img.c \
+		calcul.c \
+		color.c 
+		
 OBJ = $(SRC:.c=.o)
 
 # Chemins pour MiniLibX et headers
